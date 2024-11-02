@@ -69,6 +69,32 @@ body {
   }
 }
 
+@media print {
+  .schedule-cell {
+    background-color: inherit !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Ensure text colors are also printed */
+  .schedule-cell textarea {
+    color: inherit !important;
+  }
+}
+
+.print-mode {
+  max-width: 1500px;
+  overflow: auto;
+  zoom: 0.5;
+}
+
+@media print {
+  .print-mode {
+    zoom: 1;
+    /* Reset zoom for printing */
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

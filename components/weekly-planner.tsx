@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { format, addDays, startOfWeek, addMinutes } from "date-fns"
 import { sv } from "date-fns/locale"
-import { Calendar as CalendarIcon, Printer, Paintbrush, Type, Save, Download } from "lucide-react"
+import { Calendar as CalendarIcon, Printer, Paintbrush, Type, Save, Download, Proportions } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -52,6 +52,7 @@ export function WeeklyPlannerComponent() {
   const [selectedBackgroundColor, setSelectedBackgroundColor] = useState("#4F46E5")
   const [selectedTextColor, setSelectedTextColor] = useState("#000000")
   const [mode, setMode] = useState<"color" | "text">("color")
+  const [isPrintMode, setIsPrintMode] = useState(false)
 
   useEffect(() => {
     if (date) {
@@ -62,7 +63,7 @@ export function WeeklyPlannerComponent() {
   const handleApplyDateAndInterval = () => {
     setWeekStart(startOfWeek(date, { weekStartsOn: 1 }))
     const intervalMinutes = parseInt(interval)
-    const slotsPerDay = Math.floor((24 * 60) / intervalMinutes)
+    const slotsPerDay = Math.floor((18 * 60) / intervalMinutes) // 18 hours from 06:00 to 24:00
     const newSchedule = Array(7).fill([]).map(() => {
       const daySchedule = []
       for (let i = 0; i < slotsPerDay; i++) {
@@ -95,34 +96,55 @@ export function WeeklyPlannerComponent() {
   }
 
   const handleSave = () => {
-    if (window.confirm("Är du säker på att du vill spara nuvarande schema? Detta kommer att skriva över tidigare sparad data.")) {
-      const data = {
-        schedule,
-        date,
-        interval
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-      alert("Schema sparat!")
+    const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")
+    const scheduleNames = Object.keys(existingData)
+
+    const scheduleName = prompt(
+      `Enter a name for your schedule:\nExisting schedules:\n${scheduleNames.join("\n")}`
+    )
+    if (!scheduleName) return
+
+    const data = {
+      schedule,
+      date,
+      interval
     }
+
+    existingData[scheduleName] = data
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData))
+    alert(`Schedule "${scheduleName}" saved!`)
   }
 
   const handleLoad = () => {
-    if (window.confirm("Är du säker på att du vill ladda sparad data? Detta kommer att skriva över nuvarande schema.")) {
-      const savedData = localStorage.getItem(STORAGE_KEY)
-      if (savedData) {
-        const data = JSON.parse(savedData)
-        setSchedule(data.schedule)
-        setDate(new Date(data.date))
-        setInterval(data.interval)
-        alert("Schema laddat!")
-      } else {
-        alert("Ingen sparad data hittades.")
-      }
+    const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")
+    const scheduleNames = Object.keys(existingData)
+
+    if (scheduleNames.length === 0) {
+      alert("No saved schedules found.")
+      return
     }
+
+    const scheduleName = prompt(
+      `Enter the name of the schedule to load:\nExisting schedules:\n${scheduleNames.join("\n")}`
+    )
+    if (!scheduleName || !existingData[scheduleName]) {
+      alert("Schedule not found.")
+      return
+    }
+
+    const data = existingData[scheduleName]
+    setSchedule(data.schedule)
+    setDate(new Date(data.date))
+    setInterval(data.interval)
+    alert(`Schedule "${scheduleName}" loaded!`)
+  }
+
+  const handleProportions = () => {
+    setIsPrintMode(!isPrintMode)
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-full bg-gradient-to-b from-indigo-50 to-white min-h-screen">
+    <div className={`container mx-auto p-4 max-w-full bg-gradient-to-b from-indigo-50 to-white min-h-screen ${isPrintMode ? "print-mode" : ""}`}>
       <div className="flex flex-wrap justify-between items-center mb-6 gap-4 print:hidden">
         <div className="flex items-center space-x-2 bg-white p-2 rounded-lg shadow-sm">
           <Popover>
@@ -218,6 +240,10 @@ export function WeeklyPlannerComponent() {
               <Printer className="mr-2 h-4 w-4" />
               Skriv ut
             </Button>
+            <Button onClick={handleProportions} variant="outline">
+              <Proportions className="mr-2 h-4 w-4" />
+              Utskriftsvänlig
+            </Button>
           </div>
         </div>
       </div>
@@ -235,13 +261,13 @@ export function WeeklyPlannerComponent() {
         {schedule[0].map((_, slot) => (
           <React.Fragment key={slot}>
             <div className="text-center py-2 border-t min-w-[100px] text-indigo-900 font-medium">
-              {format(addMinutes(new Date().setHours(0, 0, 0, 0), slot * parseInt(interval)), "HH:mm")}
+              {format(addMinutes(new Date().setHours(6, 0, 0, 0), slot * parseInt(interval)), "HH:mm")}
             </div>
             {weekDays.map((_, day) => (
               <div
                 key={`${day}-${slot}`}
                 className={cn(
-                  "border-t cursor-pointer transition-all duration-200 ease-in-out min-w-[150px] min-h-[60px] relative hover:shadow-md",
+                  "schedule-cell border-t cursor-pointer transition-all duration-200 ease-in-out min-w-[150px] min-h-[60px] relative hover:shadow-md",
                   schedule[day][slot].backgroundColor === schedule[day][slot - 1]?.backgroundColor &&
                   schedule[day][slot].backgroundColor !== "" &&
                   "border-t-0"
