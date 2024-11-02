@@ -3,21 +3,35 @@ import { WeeklyPlannerComponent } from "@/components/weekly-planner";
 import { useUser } from '@/context/UserContext';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button'; // Import the Button component
+import { Button } from '@/components/ui/button';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function Home() {
   const { user, setUser } = useUser();
   const router = useRouter();
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login');
-    }
-  }, [user, router]);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        // User is signed in, set the user in your context
+        setUser(firebaseUser);
+      } else {
+        // User is signed out, redirect to login
+        setUser(null);
+        router.push('/login');
+      }
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, [router, setUser]);
 
   const handleLogout = () => {
-    setUser(null);
-    router.push('/login');
+    auth.signOut().then(() => {
+      setUser(null);
+      router.push('/login');
+    });
   };
 
   if (!user) {

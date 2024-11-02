@@ -6,6 +6,7 @@
 import { useState, useEffect } from "react"
 import { format, addDays, startOfWeek, addMinutes } from "date-fns"
 import { sv } from "date-fns/locale"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar as CalendarIcon, Printer, Paintbrush, Type, Save, Download, Proportions, Trash } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -47,12 +48,14 @@ interface ScheduleCell {
   backgroundColor: string;
   textColor: string;
   text: string;
+  borderColor: string;
 }
 
 interface Block {
   title: string
   content: string
   color: string
+  borderColor: string;
 }
 
 const STORAGE_KEY = "weekly-planner-data"
@@ -62,7 +65,9 @@ export function WeeklyPlannerComponent() {
   const [interval, setInterval] = useState("60")
   const [weekStart, setWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [schedule, setSchedule] = useState<ScheduleCell[][]>(
-    Array(7).fill([]).map(() => Array(18).fill({ backgroundColor: "", textColor: "#000000", text: "" }))
+    Array(7).fill([]).map(() => Array(18).fill({
+      backgroundColor: "", textColor: "#000000", text: "", borderColor: ""
+    }))
   )
   const [blocks, setBlocks] = useState<Block[]>([])
   const [selectedBackgroundColor, setSelectedBackgroundColor] = useState("#4F46E5")
@@ -81,6 +86,7 @@ export function WeeklyPlannerComponent() {
   const [alertDescription, setAlertDescription] = useState("");
   const [scheduleNames, setScheduleNames] = useState<string[]>([])
   const [currentScheduleName, setCurrentScheduleName] = useState<string>("");
+  const [isBorderMode, setIsBorderMode] = useState(false);
 
   useEffect(() => {
     if (date) {
@@ -110,7 +116,7 @@ export function WeeklyPlannerComponent() {
     const newSchedule = Array(7).fill([]).map(() => {
       const daySchedule = []
       for (let i = 0; i < slotsPerDay; i++) {
-        daySchedule.push({ backgroundColor: "", textColor: "#000000", text: "" })
+        daySchedule.push({ backgroundColor: "", textColor: "#000000", text: "", borderColor: "" })
       }
       return daySchedule
     })
@@ -118,15 +124,14 @@ export function WeeklyPlannerComponent() {
   }
 
   const handleCellClick = (day: number, slot: number) => {
-    if (mode === "color") {
-      const newSchedule = [...schedule]
-      newSchedule[day][slot] = {
-        ...newSchedule[day][slot],
-        backgroundColor: selectedBackgroundColor
-      }
-      setSchedule(newSchedule)
-    }
-  }
+    const newSchedule = [...schedule];
+    newSchedule[day][slot] = {
+      ...newSchedule[day][slot],
+      backgroundColor: isBorderMode ? "" : selectedBackgroundColor,
+      borderColor: isBorderMode ? selectedBackgroundColor : ""
+    };
+    setSchedule(newSchedule);
+  };
 
   const handleCellTextChange = (day: number, slot: number, text: string) => {
     const newSchedule = [...schedule]
@@ -280,6 +285,14 @@ export function WeeklyPlannerComponent() {
               onChange={(e) => setSelectedTextColor(e.target.value)}
               className="w-12 h-8 p-1 rounded"
             />
+            <label htmlFor="border-mode" className="flex items-center cursor-pointer">
+              <Checkbox
+                id="border-mode"
+                checked={isBorderMode}
+                onCheckedChange={() => setIsBorderMode(!isBorderMode)}
+              />
+            </label>
+            <label htmlFor="border-mode" className="ml-2">Border</label>
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={handleSave} variant="outline" className="bg-green-50 hover:bg-green-100" disabled={!currentScheduleName}>
@@ -327,19 +340,24 @@ export function WeeklyPlannerComponent() {
           ))}
           {schedule[0].map((_, slot) => (
             <React.Fragment key={slot}>
-              <div className="text-center py-2 border-t min-w-[100px] font-medium">
+              <div className="text-center py-2 border min-w-[100px] font-medium">
                 {format(addMinutes(new Date().setHours(6, 0, 0, 0), slot * parseInt(interval)), "HH:mm")}
               </div>
               {weekDays.map((_, day) => (
                 <div
                   key={`${day}-${slot}`}
                   className={cn(
-                    "schedule-cell border-t cursor-pointer transition-all duration-200 ease-in-out min-w-[150px] min-h-[60px] relative hover:shadow-md",
+                    "schedule-cell cursor-pointer transition-all duration-200 ease-in-out min-w-[150px] min-h-[60px] relative hover:shadow-md",
                     schedule[day][slot].backgroundColor === schedule[day][slot - 1]?.backgroundColor &&
                     schedule[day][slot].backgroundColor !== "" &&
                     "border-t-0"
                   )}
-                  style={{ backgroundColor: schedule[day][slot].backgroundColor }}
+                  style={{
+                    backgroundColor: schedule[day][slot].backgroundColor,
+                    borderColor: schedule[day][slot].borderColor,
+                    borderStyle: schedule[day][slot].borderColor ? "solid" : "none",
+                    borderWidth: schedule[day][slot].borderColor ? "2px" : "0px" // Adjust border width as needed
+                  }}
                   onClick={() => handleCellClick(day, slot)}
                 >
                   <textarea
@@ -358,7 +376,7 @@ export function WeeklyPlannerComponent() {
             </React.Fragment>
           ))}
         </div>
-        <ExtraTasks blocks={blocks} setBlocks={setBlocks} selectedBackgroundColor={selectedBackgroundColor} selectedTextColor={selectedTextColor} />
+        <ExtraTasks blocks={blocks} setBlocks={setBlocks} selectedBackgroundColor={selectedBackgroundColor} selectedTextColor={selectedTextColor} isBorderMode={isBorderMode} />
       </div>
       <CustomAlertDialog
         isOpen={isDialogOpen}

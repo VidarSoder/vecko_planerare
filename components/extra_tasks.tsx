@@ -7,16 +7,17 @@ interface Block {
     title: string
     content: string
     color: string
+    borderColor: string
 }
 
-export function ExtraTasks({ blocks, setBlocks, selectedBackgroundColor, selectedTextColor }: { blocks: Block[], setBlocks: React.Dispatch<React.SetStateAction<Block[]>>, selectedBackgroundColor: string, selectedTextColor: string }) {
+export function ExtraTasks({ blocks, setBlocks, selectedBackgroundColor, selectedTextColor, isBorderMode }: { blocks: Block[], setBlocks: React.Dispatch<React.SetStateAction<Block[]>>, selectedBackgroundColor: string, selectedTextColor: string, isBorderMode: boolean }) {
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [newBlockTitle, setNewBlockTitle] = useState("")
     const [newBlockContent, setNewBlockContent] = useState("")
 
     const addBlock = () => {
         if (!newBlockTitle) return
-        setBlocks([...blocks, { title: newBlockTitle, content: newBlockContent || "", color: selectedBackgroundColor }])
+        setBlocks([...blocks, { title: newBlockTitle, content: newBlockContent || "", color: isBorderMode ? "" : selectedBackgroundColor, borderColor: isBorderMode ? selectedBackgroundColor : "" }])
         setNewBlockTitle("")
         setNewBlockContent("")
         setIsDialogOpen(false)
@@ -35,7 +36,7 @@ export function ExtraTasks({ blocks, setBlocks, selectedBackgroundColor, selecte
             </Button>
             <div className="flex flex-col gap-4">
                 {blocks.map((block, index) => (
-                    <div key={index} className="p-4 border rounded shadow-sm max-w-[300px] relative" style={{ backgroundColor: block.color }}>
+                    <div key={index} className="p-4 border rounded shadow-sm max-w-[300px] relative" style={{ backgroundColor: block.color, borderColor: block.borderColor, borderWidth: "2px", borderStyle: "solid" }}>
                         <Button
                             variant="ghost"
                             size="sm"
