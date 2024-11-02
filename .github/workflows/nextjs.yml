@@ -63,6 +63,8 @@ jobs:
           echo "NEXT_PUBLIC_APP_ID=${{ secrets.NEXT_PUBLIC_APP_ID }}" >> .env.production
           echo "NEXT_PUBLIC_MEASUREMENT_ID=${{ secrets.NEXT_PUBLIC_MEASUREMENT_ID }}" >> .env.production
           echo "NEXT_PUBLIC_API_KEY=${{ secrets.NEXT_PUBLIC_API_KEY }}" >> .env.production
+      - name: Print .env.production
+        run: cat .env.production
       - name: Print environment variables
         run: |
           echo "NEXT_PUBLIC_PROJECT_ID is set ${{ secrets.NEXT_PUBLIC_PROJECT_ID }}"
