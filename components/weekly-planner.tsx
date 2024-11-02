@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { format, addDays, startOfWeek, addMinutes } from "date-fns"
 import { sv } from "date-fns/locale"
-import { Calendar as CalendarIcon, Printer, Paintbrush, Type, Save, Download, Proportions } from "lucide-react"
+import { Calendar as CalendarIcon, Printer, Paintbrush, Type, Save, Download, Proportions, Trash } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -100,7 +100,7 @@ export function WeeklyPlannerComponent() {
     const scheduleNames = Object.keys(existingData)
 
     const scheduleName = prompt(
-      `Enter a name for your schedule:\nExisting schedules:\n${scheduleNames.join("\n")}`
+      `Ange ett namn för ditt schema:\nBefintliga scheman:\n${scheduleNames.join("\n")}`
     )
     if (!scheduleName) return
 
@@ -112,7 +112,7 @@ export function WeeklyPlannerComponent() {
 
     existingData[scheduleName] = data
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData))
-    alert(`Schedule "${scheduleName}" saved!`)
+    alert(`Schema "${scheduleName}" sparat!`)
   }
 
   const handleLoad = () => {
@@ -120,15 +120,15 @@ export function WeeklyPlannerComponent() {
     const scheduleNames = Object.keys(existingData)
 
     if (scheduleNames.length === 0) {
-      alert("No saved schedules found.")
+      alert("Inga sparade scheman hittades.")
       return
     }
 
     const scheduleName = prompt(
-      `Enter the name of the schedule to load:\nExisting schedules:\n${scheduleNames.join("\n")}`
+      `Ange namnet på schemat att ladda:\nBefintliga scheman:\n${scheduleNames.join("\n")}`
     )
     if (!scheduleName || !existingData[scheduleName]) {
-      alert("Schedule not found.")
+      alert("Schema hittades inte.")
       return
     }
 
@@ -136,11 +136,33 @@ export function WeeklyPlannerComponent() {
     setSchedule(data.schedule)
     setDate(new Date(data.date))
     setInterval(data.interval)
-    alert(`Schedule "${scheduleName}" loaded!`)
+    alert(`Schema "${scheduleName}" laddat!`)
   }
 
   const handleProportions = () => {
     setIsPrintMode(!isPrintMode)
+  }
+
+  const handleDelete = () => {
+    const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")
+    const scheduleNames = Object.keys(existingData)
+
+    if (scheduleNames.length === 0) {
+      alert("Inga sparade scheman hittades.")
+      return
+    }
+
+    const scheduleName = prompt(
+      `Ange namnet på schemat att ta bort:\nBefintliga scheman:\n${scheduleNames.join("\n")}`
+    )
+    if (!scheduleName || !existingData[scheduleName]) {
+      alert("Schema hittades inte.")
+      return
+    }
+
+    delete existingData[scheduleName]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData))
+    alert(`Schema "${scheduleName}" borttaget!`)
   }
 
   return (
@@ -243,6 +265,10 @@ export function WeeklyPlannerComponent() {
             <Button onClick={handleProportions} variant="outline">
               <Proportions className="mr-2 h-4 w-4" />
               Utskriftsvänlig
+            </Button>
+            <Button onClick={handleDelete} variant="outline" className="bg-red-50 hover:bg-red-100">
+              <Trash className="mr-2 h-4 w-4" />
+              Ta bort sparat
             </Button>
           </div>
         </div>
