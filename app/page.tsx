@@ -1,9 +1,12 @@
-import { WeeklyPlannerComponent } from "@/components/weekly-planner";
+'use client'
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  return (
-    <div>
-      <WeeklyPlannerComponent />
-    </div>
-  );
+    const router = useRouter();
+    router.push('/login');
+    return (
+        <div>
+            wrong
+        </div>
+    );
 }
