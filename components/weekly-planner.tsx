@@ -1,5 +1,8 @@
 "use client"
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-empty-object-type */
+
 import { useState, useEffect } from "react"
 import { format, addDays, startOfWeek, addMinutes } from "date-fns"
 import { sv } from "date-fns/locale"
@@ -22,6 +25,12 @@ import {
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import React from "react"
+import { ExtraTasks } from "./extra_tasks"
+import { CustomAlertDialog } from "./custom_alert_dialog"
+import { LoadScheduleDialog } from "./load_schedule_dialog"
+import { DeleteScheduleDialog } from "./delete_schedule_dialog"
+import { CreateScheduleDialog } from "./create_schedule_dialog"
+import { CustomAlert } from "./custom_alert"
 
 const intervals = [
   { value: "10", label: "10 minuter" },
@@ -40,6 +49,12 @@ interface ScheduleCell {
   text: string;
 }
 
+interface Block {
+  title: string
+  content: string
+  color: string
+}
+
 const STORAGE_KEY = "weekly-planner-data"
 
 export function WeeklyPlannerComponent() {
@@ -47,18 +62,46 @@ export function WeeklyPlannerComponent() {
   const [interval, setInterval] = useState("60")
   const [weekStart, setWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [schedule, setSchedule] = useState<ScheduleCell[][]>(
-    Array(7).fill([]).map(() => Array(24).fill({ backgroundColor: "", textColor: "#000000", text: "" }))
+    Array(7).fill([]).map(() => Array(18).fill({ backgroundColor: "", textColor: "#000000", text: "" }))
   )
+  const [blocks, setBlocks] = useState<Block[]>([])
   const [selectedBackgroundColor, setSelectedBackgroundColor] = useState("#4F46E5")
   const [selectedTextColor, setSelectedTextColor] = useState("#000000")
   const [mode, setMode] = useState<"color" | "text">("color")
   const [isPrintMode, setIsPrintMode] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [dialogTitle, setDialogTitle] = useState("")
+  const [dialogDescription, setDialogDescription] = useState("")
+  const [onDialogConfirm, setOnDialogConfirm] = useState(() => () => { })
+  const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertDescription, setAlertDescription] = useState("");
+  const [scheduleNames, setScheduleNames] = useState<string[]>([])
+  const [currentScheduleName, setCurrentScheduleName] = useState<string>("");
 
   useEffect(() => {
     if (date) {
       setWeekStart(startOfWeek(date, { weekStartsOn: 1 }))
     }
   }, [date])
+
+  useEffect(() => {
+    handleApplyDateAndInterval()
+  }, [])
+
+  useEffect(() => {
+    updateScheduleNames();
+  }, []);
+
+  const updateScheduleNames = () => {
+    if (typeof window !== "undefined") {
+      const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      setScheduleNames(Object.keys(existingData));
+    }
+  };
 
   const handleApplyDateAndInterval = () => {
     setWeekStart(startOfWeek(date, { weekStartsOn: 1 }))
@@ -95,75 +138,64 @@ export function WeeklyPlannerComponent() {
     window.print()
   }
 
+  const openDialog = (title: string, description: string, confirmCallback: () => void) => {
+    setDialogTitle(title);
+    setDialogDescription(description);
+    setOnDialogConfirm(() => confirmCallback);
+    setIsDialogOpen(true);
+  };
+
+  const showAlert = (title: string, description: string) => {
+    setAlertTitle(title);
+    setAlertDescription(description);
+    setAlertOpen(true);
+  };
+
   const handleSave = () => {
-    const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")
-    const scheduleNames = Object.keys(existingData)
-
-    const scheduleName = prompt(
-      `Ange ett namn för ditt schema:\nBefintliga scheman:\n${scheduleNames.join("\n")}`
-    )
-    if (!scheduleName) return
-
-    const data = {
-      schedule,
-      date,
-      interval
+    if (!currentScheduleName) {
+      showAlert("Fel", "Du måste skapa ett schema innan du kan spara.");
+      return;
     }
-
-    existingData[scheduleName] = data
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData))
-    alert(`Schema "${scheduleName}" sparat!`)
-  }
+    if (typeof window !== "undefined") {
+      const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      const data = {
+        schedule,
+        blocks,
+        date,
+        interval,
+        selectedBackgroundColor,
+        selectedTextColor,
+      };
+      existingData[currentScheduleName] = data;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData));
+      showAlert("Schema sparat", `Schema "${currentScheduleName}" har sparats!`);
+      updateScheduleNames(); // Update schedule names after saving
+    }
+  };
 
   const handleLoad = () => {
-    const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")
-    const scheduleNames = Object.keys(existingData)
-
     if (scheduleNames.length === 0) {
-      alert("Inga sparade scheman hittades.")
-      return
+      showAlert("Inga scheman", "Inga sparade scheman hittades.");
+      return;
     }
-
-    const scheduleName = prompt(
-      `Ange namnet på schemat att ladda:\nBefintliga scheman:\n${scheduleNames.join("\n")}`
-    )
-    if (!scheduleName || !existingData[scheduleName]) {
-      alert("Schema hittades inte.")
-      return
-    }
-
-    const data = existingData[scheduleName]
-    setSchedule(data.schedule)
-    setDate(new Date(data.date))
-    setInterval(data.interval)
-    alert(`Schema "${scheduleName}" laddat!`)
-  }
+    setIsLoadDialogOpen(true);
+  };
 
   const handleProportions = () => {
     setIsPrintMode(!isPrintMode)
   }
 
   const handleDelete = () => {
-    const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")
-    const scheduleNames = Object.keys(existingData)
-
     if (scheduleNames.length === 0) {
-      alert("Inga sparade scheman hittades.")
-      return
+      showAlert("Inga scheman", "Inga sparade scheman hittades.");
+      return;
     }
+    setIsDeleteDialogOpen(true);
+  };
 
-    const scheduleName = prompt(
-      `Ange namnet på schemat att ta bort:\nBefintliga scheman:\n${scheduleNames.join("\n")}`
-    )
-    if (!scheduleName || !existingData[scheduleName]) {
-      alert("Schema hittades inte.")
-      return
-    }
-
-    delete existingData[scheduleName]
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData))
-    alert(`Schema "${scheduleName}" borttaget!`)
-  }
+  const handleCreate = () => {
+    setIsCreateDialogOpen(true);
+  };
 
   return (
     <div className={`container mx-auto p-4 max-w-full bg-gradient-to-b from-indigo-50 to-white min-h-screen ${isPrintMode ? "print-mode" : ""}`}>
@@ -250,7 +282,7 @@ export function WeeklyPlannerComponent() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={handleSave} variant="outline" className="bg-green-50 hover:bg-green-100">
+            <Button onClick={handleSave} variant="outline" className="bg-green-50 hover:bg-green-100" disabled={!currentScheduleName}>
               <Save className="mr-2 h-4 w-4" />
               Spara
             </Button>
@@ -268,55 +300,124 @@ export function WeeklyPlannerComponent() {
             </Button>
             <Button onClick={handleDelete} variant="outline" className="bg-red-50 hover:bg-red-100">
               <Trash className="mr-2 h-4 w-4" />
-              Ta bort sparat
+              Ta bort sparade
+            </Button>
+            <Button onClick={handleCreate} variant="outline" className="bg-green-50 hover:bg-green-100">
+              Skapa
             </Button>
           </div>
         </div>
+        <div className="flex items-center space-x-2">
+          <span className="text-lg font-semibold text-indigo-900">
+            {currentScheduleName || "Skapa ett schema"}
+          </span>
+        </div>
       </div>
-      <div className="grid grid-cols-8 gap-1 bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-        <div className="font-bold text-center py-2 min-w-[100px]">Tid</div>
-        {weekDays.map((day, index) => (
-          <div key={day} className="font-bold text-center py-2 min-w-[150px] text-indigo-900">
-            {day}
-            <br />
-            <span className="text-indigo-600">
-              {format(addDays(weekStart, index), "d MMM", { locale: sv })}
-            </span>
-          </div>
-        ))}
-        {schedule[0].map((_, slot) => (
-          <React.Fragment key={slot}>
-            <div className="text-center py-2 border-t min-w-[100px] text-indigo-900 font-medium">
-              {format(addMinutes(new Date().setHours(6, 0, 0, 0), slot * parseInt(interval)), "HH:mm")}
+      <div className="flex">
+        <div className="grid grid-cols-8 gap-1 bg-white p-6 rounded-xl shadow-lg overflow-x-auto flex-grow">
+          <div className="font-bold text-center py-2 min-w-[100px]">Tid</div>
+          {weekDays.map((day, index) => (
+            <div key={day} className="font-bold text-center py-2 min-w-[150px]">
+              {day}
+              <br />
+              <span>
+                {format(addDays(weekStart, index), "d MMM", { locale: sv })}
+              </span>
             </div>
-            {weekDays.map((_, day) => (
-              <div
-                key={`${day}-${slot}`}
-                className={cn(
-                  "schedule-cell border-t cursor-pointer transition-all duration-200 ease-in-out min-w-[150px] min-h-[60px] relative hover:shadow-md",
-                  schedule[day][slot].backgroundColor === schedule[day][slot - 1]?.backgroundColor &&
-                  schedule[day][slot].backgroundColor !== "" &&
-                  "border-t-0"
-                )}
-                style={{ backgroundColor: schedule[day][slot].backgroundColor }}
-                onClick={() => handleCellClick(day, slot)}
-              >
-                <textarea
-                  className="w-full h-full p-2 bg-transparent resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
-                  value={schedule[day][slot].text}
-                  onChange={(e) => handleCellTextChange(day, slot, e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  readOnly={mode === "color"}
-                  style={{
-                    color: schedule[day][slot].textColor,
-                    pointerEvents: mode === "color" ? "none" : "auto"
-                  }}
-                />
+          ))}
+          {schedule[0].map((_, slot) => (
+            <React.Fragment key={slot}>
+              <div className="text-center py-2 border-t min-w-[100px] font-medium">
+                {format(addMinutes(new Date().setHours(6, 0, 0, 0), slot * parseInt(interval)), "HH:mm")}
               </div>
-            ))}
-          </React.Fragment>
-        ))}
+              {weekDays.map((_, day) => (
+                <div
+                  key={`${day}-${slot}`}
+                  className={cn(
+                    "schedule-cell border-t cursor-pointer transition-all duration-200 ease-in-out min-w-[150px] min-h-[60px] relative hover:shadow-md",
+                    schedule[day][slot].backgroundColor === schedule[day][slot - 1]?.backgroundColor &&
+                    schedule[day][slot].backgroundColor !== "" &&
+                    "border-t-0"
+                  )}
+                  style={{ backgroundColor: schedule[day][slot].backgroundColor }}
+                  onClick={() => handleCellClick(day, slot)}
+                >
+                  <textarea
+                    className="w-full h-full p-2 bg-transparent resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
+                    value={schedule[day][slot].text}
+                    onChange={(e) => handleCellTextChange(day, slot, e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    readOnly={mode === "color"}
+                    style={{
+                      color: schedule[day][slot].textColor,
+                      pointerEvents: mode === "color" ? "none" : "auto"
+                    }}
+                  />
+                </div>
+              ))}
+            </React.Fragment>
+          ))}
+        </div>
+        <ExtraTasks blocks={blocks} setBlocks={setBlocks} selectedBackgroundColor={selectedBackgroundColor} selectedTextColor={selectedTextColor} />
       </div>
+      <CustomAlertDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        onConfirm={onDialogConfirm}
+        title={dialogTitle}
+        description={dialogDescription}
+        textColor={selectedTextColor}
+      />
+      <LoadScheduleDialog
+        isOpen={isLoadDialogOpen}
+        onClose={() => setIsLoadDialogOpen(false)}
+        onConfirm={(scheduleName) => {
+          if (typeof window !== "undefined") {
+            const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")[scheduleName];
+            setSchedule(data.schedule);
+            setBlocks(data.blocks);
+            setDate(data.date);
+            setInterval(data.interval);
+            setSelectedBackgroundColor(data.selectedBackgroundColor);
+            setSelectedTextColor(data.selectedTextColor);
+            setCurrentScheduleName(scheduleName);
+            showAlert("Schema laddat", `Schema "${scheduleName}" laddat!`);
+          }
+        }}
+        scheduleNames={scheduleNames}
+      />
+      <DeleteScheduleDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={(scheduleName) => {
+          const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+          delete existingData[scheduleName];
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData));
+          setScheduleNames(Object.keys(existingData));
+          setCurrentScheduleName("Inget schema valt");
+          showAlert("Schema borttaget", `Schema "${scheduleName}" har tagits bort!`);
+        }}
+        scheduleNames={scheduleNames}
+      />
+      <CreateScheduleDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onConfirm={(scheduleName) => {
+          if (scheduleNames.includes(scheduleName)) {
+            showAlert("Fel", "Schemanamnet finns redan. Vänligen välj ett annat namn.");
+            return;
+          }
+          setCurrentScheduleName(scheduleName);
+          showAlert("Schema skapat", `Schema "${scheduleName}" har skapats!`);
+        }}
+        existingNames={scheduleNames}
+      />
+      <CustomAlert
+        isOpen={alertOpen}
+        onClose={() => setAlertOpen(false)}
+        title={alertTitle}
+        description={alertDescription}
+      />
     </div>
   )
 }
