@@ -2,12 +2,16 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-empty-object-type */
+// Property 'then' does not exist on type 'void'.ts(2339) ignore this
+
+
 
 import { useState, useEffect } from "react"
 import { format, addDays, startOfWeek, addMinutes } from "date-fns"
 import { sv } from "date-fns/locale"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar as CalendarIcon, Printer, Paintbrush, Type, Save, Download, Proportions, Trash } from "lucide-react"
+import { createBlob, fetchAllBlobs, deleteBlob, saveBlob, updateBlob } from '@/components/firebase/firestore';
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -32,6 +36,7 @@ import { LoadScheduleDialog } from "./load_schedule_dialog"
 import { DeleteScheduleDialog } from "./delete_schedule_dialog"
 import { CreateScheduleDialog } from "./create_schedule_dialog"
 import { CustomAlert } from "./custom_alert"
+import { useUser } from "@/context/UserContext"
 
 const intervals = [
   { value: "10", label: "10 minuter" },
@@ -61,6 +66,7 @@ interface Block {
 const STORAGE_KEY = "weekly-planner-data"
 
 export function WeeklyPlannerComponent() {
+  const { user, setUser } = useUser();
   const [date, setDate] = useState<Date>(new Date())
   const [interval, setInterval] = useState("60")
   const [weekStart, setWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }))
@@ -103,9 +109,14 @@ export function WeeklyPlannerComponent() {
   }, []);
 
   const updateScheduleNames = () => {
-    if (typeof window !== "undefined") {
-      const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-      setScheduleNames(Object.keys(existingData));
+    if (user?.uid) {
+      fetchAllBlobs(user.uid)
+        .then((blobs: any[]) => {
+          setScheduleNames(blobs.map((blob: { id: any }) => blob.id));
+        })
+        .catch((error: any) => {
+          console.error("Error fetching schedule names:", error);
+        });
     }
   };
 
@@ -161,8 +172,7 @@ export function WeeklyPlannerComponent() {
       showAlert("Fel", "Du måste skapa ett schema innan du kan spara.");
       return;
     }
-    if (typeof window !== "undefined") {
-      const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    if (user?.uid) {
       const data = {
         schedule,
         blocks,
@@ -171,10 +181,15 @@ export function WeeklyPlannerComponent() {
         selectedBackgroundColor,
         selectedTextColor,
       };
-      existingData[currentScheduleName] = data;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData));
-      showAlert("Schema sparat", `Schema "${currentScheduleName}" har sparats!`);
-      updateScheduleNames(); // Update schedule names after saving
+      saveBlob(currentScheduleName, data, user.uid)
+        .then(() => {
+          showAlert("Schema sparat", `Schema "${currentScheduleName}" har sparats!`);
+          updateScheduleNames(); // Update schedule names after saving
+        })
+        .catch((error: any) => {
+          console.error("Error saving schedule:", error);
+          showAlert("Fel", "Det gick inte att spara schemat.");
+        });
     }
   };
 
@@ -184,6 +199,31 @@ export function WeeklyPlannerComponent() {
       return;
     }
     setIsLoadDialogOpen(true);
+  };
+
+  const handleLoadConfirm = (scheduleName: string) => {
+    if (user?.uid) {
+      fetchAllBlobs(user.uid)
+        .then((blobs: any[]) => {
+          const data = blobs.find((blob: { id: string }) => blob.id === scheduleName)?.data;
+          if (data) {
+            setSchedule(data.schedule);
+            setBlocks(data.blocks);
+            setDate(data.date);
+            setInterval(data.interval);
+            setSelectedBackgroundColor(data.selectedBackgroundColor);
+            setSelectedTextColor(data.selectedTextColor);
+            setCurrentScheduleName(scheduleName);
+            showAlert("Schema laddat", `Schema "${scheduleName}" laddat!`);
+          } else {
+            showAlert("Fel", "Det gick inte att ladda schemat.");
+          }
+        })
+        .catch((error: any) => {
+          console.error("Error loading schedule:", error);
+          showAlert("Fel", "Det gick inte att ladda schemat.");
+        });
+    }
   };
 
   const handleProportions = () => {
@@ -196,6 +236,20 @@ export function WeeklyPlannerComponent() {
       return;
     }
     setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = (scheduleName: string) => {
+    if (user?.uid) {
+      deleteBlob(scheduleName, user.uid)
+        .then(() => {
+          showAlert("Schema borttaget", `Schema "${scheduleName}" har tagits bort!`);
+          updateScheduleNames(); // Update schedule names after deletion
+        })
+        .catch((error: any) => {
+          console.error("Error deleting schedule:", error);
+          showAlert("Fel", "Det gick inte att ta bort schemat.");
+        });
+    }
   };
 
   const handleCreate = () => {
@@ -389,32 +443,13 @@ export function WeeklyPlannerComponent() {
       <LoadScheduleDialog
         isOpen={isLoadDialogOpen}
         onClose={() => setIsLoadDialogOpen(false)}
-        onConfirm={(scheduleName) => {
-          if (typeof window !== "undefined") {
-            const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")[scheduleName];
-            setSchedule(data.schedule);
-            setBlocks(data.blocks);
-            setDate(data.date);
-            setInterval(data.interval);
-            setSelectedBackgroundColor(data.selectedBackgroundColor);
-            setSelectedTextColor(data.selectedTextColor);
-            setCurrentScheduleName(scheduleName);
-            showAlert("Schema laddat", `Schema "${scheduleName}" laddat!`);
-          }
-        }}
+        onConfirm={handleLoadConfirm}
         scheduleNames={scheduleNames}
       />
       <DeleteScheduleDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
-        onConfirm={(scheduleName) => {
-          const existingData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-          delete existingData[scheduleName];
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData));
-          setScheduleNames(Object.keys(existingData));
-          setCurrentScheduleName("Inget schema valt");
-          showAlert("Schema borttaget", `Schema "${scheduleName}" har tagits bort!`);
-        }}
+        onConfirm={handleDeleteConfirm}
         scheduleNames={scheduleNames}
       />
       <CreateScheduleDialog

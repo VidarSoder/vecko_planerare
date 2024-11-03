@@ -6,10 +6,12 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { createBlob, fetchAllBlobs } from '@/components/firebase/firestore';
 
 export default function Home() {
   const { user, setUser } = useUser();
   const router = useRouter();
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -26,6 +28,19 @@ export default function Home() {
     // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [router, setUser]);
+
+  useEffect(() => {
+    // const loginUser = async () => {
+    //   await signInWithIdToken(auth.currentUser?.getIdToken())
+    // }
+
+    // Cleanup subscription on unmount
+    if (user?.uid) {
+      fetchAllBlobs(user.uid)
+      console.log('user', user)
+      // loginUser()
+    }
+  }, [user]);
 
   const handleLogout = () => {
     auth.signOut().then(() => {
