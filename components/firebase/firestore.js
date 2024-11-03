@@ -1,5 +1,5 @@
 import { auth, db, googleProvider } from "@/lib/firebase";
-import { collection, doc, setDoc, getDocs, query, where, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc, setDoc, getDocs, query, where, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
 
 // Fetch all blobs for the current user
@@ -13,28 +13,28 @@ export function signInWithUserToken(user) {
         return;
     }
 
-    // Fetch the fresh ID token
-    user.getIdToken()
-        .then((idToken) => {
-            if (!idToken) {
-                console.error("Failed to retrieve a valid ID token.");
-                return;
-            }
+    // // Fetch the fresh ID token
+    // user.getIdToken()
+    //     .then((idToken) => {
+    //         if (!idToken) {
+    //             console.error("Failed to retrieve a valid ID token.");
+    //             return;
+    //         }
 
-            const credential = GoogleAuthProvider.credential(idToken);
+    //         const credential = GoogleAuthProvider.credential(idToken);
 
-            // Sign in using the fetched credential
-            signInWithCredential(auth, credential)
-                .then((result) => {
-                    userId = result.user.uid; // Set the user ID globally after successful sign-in
-                })
-                .catch((error) => {
-                    console.error('Error signing in with credential:', error);
-                });
-        })
-        .catch((error) => {
-            console.error("Error retrieving ID token:", error);
-        });
+    //         // Sign in using the fetched credential
+    //         signInWithCredential(auth, credential)
+    //             .then((result) => {
+    //                 userId = result.user.uid; // Set the user ID globally after successful sign-in
+    //             })
+    //             .catch((error) => {
+    //                 console.error('Error signing in with credential:', error);
+    //             });
+    //     })
+    //     .catch((error) => {
+    //         console.error("Error retrieving ID token:", error);
+    //     });
 }
 
 export function fetchAllBlobs(userId) {
@@ -53,6 +53,7 @@ export function fetchAllBlobs(userId) {
                 // Parse the JSON string back into an object
                 const parsedData = JSON.parse(data.data);
                 blobs.push({
+                    updated_at: data.updated_at,
                     id: doc.id,
                     data: parsedData
                 });
@@ -105,6 +106,8 @@ export function createBlob(blobName, blobData, userId) {
     setDoc(blobRef, {
         data: blobData,
         userId: userId, // Store the user's ID
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
     })
         .then(() => {
             console.log("Blob created successfully!");
@@ -134,7 +137,7 @@ export function deleteBlob(blobName, userId) {
 }
 
 // Save a blob (overwrites existing blob with the same name)
-export function saveBlob(blobName, blobData, userId) {
+export async function saveBlob(blobName, blobData, userId) {
     if (!userId) {
         console.error("User is not authenticated");
         return Promise.reject("User is not authenticated");
@@ -143,16 +146,17 @@ export function saveBlob(blobName, blobData, userId) {
 
     // Convert blobData to a JSON string
     const dataToSave = JSON.stringify(blobData);
+    try {
 
-    return setDoc(blobRef, {
-        data: dataToSave,
-        userId: userId
-    }, { merge: true })
-        .then(() => {
-            console.log("Blob saved successfully!");
-        })
-        .catch(error => {
-            console.error("Error saving blob:", error);
-            throw error; // Propagate the error
-        });
+        await setDoc(blobRef, {
+            data: dataToSave,
+            userId: userId,
+            updated_at: serverTimestamp()  // Always update updated_at
+        }, { merge: true });
+
+        console.log("Blob saved successfully!");
+    } catch (error) {
+        console.error("Error saving blob:", error);
+        throw error; // Propagate the error
+    }
 }
