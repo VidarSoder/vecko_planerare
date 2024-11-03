@@ -97,16 +97,15 @@ export function WeeklyPlannerComponent() {
   const [isBorderMode, setIsBorderMode] = useState(false);
   const [currentBlob, setCurrentBlob] = useState<any>(null);
   const [allBlobs, setAllBlobs] = useState<any[]>([]);
+  const [isSaveAlertOpen, setIsSaveAlertOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<{ day: number; slot: number } | null>(null);
 
   useEffect(() => {
     if (date) {
       setWeekStart(startOfWeek(date, { weekStartsOn: 1 }))
     }
   }, [date])
-
-  useEffect(() => {
-    handleApplyDateAndInterval()
-  }, [])
 
   useEffect(() => {
     updateScheduleNames();
@@ -136,6 +135,21 @@ export function WeeklyPlannerComponent() {
     }
   };
 
+  const handleSaveConfirm = () => {
+    setIsSaveAlertOpen(false);
+    setWeekStart(startOfWeek(date, { weekStartsOn: 1 }));
+    const intervalMinutes = parseInt(interval);
+    const slotsPerDay = Math.floor((18 * 60) / intervalMinutes);
+    const newSchedule = Array(7).fill([]).map(() => {
+      const daySchedule = [];
+      for (let i = 0; i < slotsPerDay; i++) {
+        daySchedule.push({ backgroundColor: "", textColor: "#000000", text: "", borderColor: "" });
+      }
+      return daySchedule;
+    });
+    setSchedule(newSchedule);
+  };
+
   const formatTimestamp = (timestamp: any) => {
     if (!timestamp || !timestamp.seconds) return '';
     const date = new Date(timestamp.seconds * 1000);
@@ -143,18 +157,9 @@ export function WeeklyPlannerComponent() {
   };
 
   const handleApplyDateAndInterval = () => {
-    setWeekStart(startOfWeek(date, { weekStartsOn: 1 }))
-    const intervalMinutes = parseInt(interval)
-    const slotsPerDay = Math.floor((18 * 60) / intervalMinutes)
-    const newSchedule = Array(7).fill([]).map(() => {
-      const daySchedule = []
-      for (let i = 0; i < slotsPerDay; i++) {
-        daySchedule.push({ backgroundColor: "", textColor: "#000000", text: "", borderColor: "" })
-      }
-      return daySchedule
-    })
-    setSchedule(newSchedule)
-  }
+    console.log('why am i here')
+    setIsSaveAlertOpen(true);
+  };
 
   const handleCellClick = (day: number, slot: number) => {
     const newSchedule = [...schedule];
@@ -311,8 +316,47 @@ export function WeeklyPlannerComponent() {
     }
   };
 
+  const handleMouseDown = (day: number, slot: number, event: React.MouseEvent) => {
+    if (event.shiftKey) {
+      setIsDragging(true);
+      setDragStart({ day, slot });
+    } else if (mode === "color") {
+      handleCellClick(day, slot);
+
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setDragStart(null);
+  };
+
+  const handleMouseEnter = (day: number, slot: number) => {
+    if (isDragging && dragStart) {
+      const newSchedule = [...schedule];
+      const startDay = Math.min(dragStart.day, day);
+      const endDay = Math.max(dragStart.day, day);
+      const startSlot = Math.min(dragStart.slot, slot);
+      const endSlot = Math.max(dragStart.slot, slot);
+
+      for (let d = startDay; d <= endDay; d++) {
+        for (let s = startSlot; s <= endSlot; s++) {
+          newSchedule[d][s] = {
+            ...newSchedule[d][s],
+            backgroundColor: isBorderMode ? "" : selectedBackgroundColor,
+            borderColor: isBorderMode ? selectedBackgroundColor : ""
+          };
+        }
+      }
+      setSchedule(newSchedule);
+    }
+  };
+
   return (
-    <div className={`container mx-auto p-4 max-w-full bg-gradient-to-b from-indigo-50 to-white min-h-screen ${isPrintMode ? "print-mode" : ""}`}>
+    <div
+      className={`container mx-auto p-4 max-w-full bg-gradient-to-b from-indigo-50 to-white min-h-screen ${isPrintMode ? "print-mode" : ""}`}
+      onMouseUp={handleMouseUp}
+    >
       <div className="flex flex-wrap justify-between items-center mb-6 gap-4 print:hidden">
         <div className="flex items-center space-x-2 bg-white p-2 rounded-lg shadow-sm">
           <Popover>
@@ -350,9 +394,10 @@ export function WeeklyPlannerComponent() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={handleApplyDateAndInterval} variant="secondary">
+          <Button onClick={() => handleApplyDateAndInterval()} variant="secondary">
             Spara
           </Button>
+
         </div>
         <div className="flex items-center space-x-2 flex-wrap gap-2">
           <div className="flex gap-1 bg-white rounded-md p-1 shadow-sm">
@@ -475,9 +520,10 @@ export function WeeklyPlannerComponent() {
                     backgroundColor: schedule[day][slot].backgroundColor,
                     borderColor: schedule[day][slot].borderColor,
                     borderStyle: schedule[day][slot].borderColor ? "solid" : "none",
-                    borderWidth: schedule[day][slot].borderColor ? "2px" : "0px" // Adjust border width as needed
+                    borderWidth: schedule[day][slot].borderColor ? "2px" : "0px"
                   }}
-                  onClick={() => handleCellClick(day, slot)}
+                  onMouseDown={(e) => handleMouseDown(day, slot, e)}
+                  onMouseEnter={() => handleMouseEnter(day, slot)}
                 >
                   <textarea
                     className="w-full h-full p-2 bg-transparent resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
@@ -528,6 +574,13 @@ export function WeeklyPlannerComponent() {
         onClose={() => setAlertOpen(false)}
         title={alertTitle}
         description={alertDescription}
+      />
+      <CustomAlert
+        isOpen={isSaveAlertOpen}
+        onClose={() => setIsSaveAlertOpen(false)}
+        title="Varning"
+        description="Om du klickar spara kommer allt osparat gå förlorat"
+        onConfirm={() => handleSaveConfirm()}
       />
     </div>
   )

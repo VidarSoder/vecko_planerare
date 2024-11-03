@@ -49,7 +49,18 @@ export default function Home() {
     });
   };
 
+  useEffect(() => {
+    if (!user) {
+      const timeoutId = setTimeout(() => {
+        router.push('/login');
+      }, 5000); // 5000 milliseconds = 5 seconds
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [user, router]);
+
   if (!user) {
+    console.log('user', user)
     return <div>Loading...</div>;
   }
 

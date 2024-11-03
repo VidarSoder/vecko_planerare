@@ -15,9 +15,10 @@ interface CustomAlertProps {
     onClose: () => void;
     title: string;
     description: string;
+    onConfirm?: () => void;
 }
 
-export function CustomAlert({ isOpen, onClose, title, description }: CustomAlertProps) {
+export function CustomAlert({ isOpen, onClose, title, description, onConfirm }: CustomAlertProps) {
     if (!isOpen) return null;
 
     return (
@@ -31,7 +32,7 @@ export function CustomAlert({ isOpen, onClose, title, description }: CustomAlert
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={onClose}>Continue</AlertDialogAction>
+                    <AlertDialogAction onClick={onConfirm ? onConfirm : onClose}>Continue</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
